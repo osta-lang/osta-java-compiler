@@ -6,6 +6,7 @@ import org.osta.lex.token.TokenType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class Parser {
 
@@ -35,14 +36,20 @@ public class Parser {
                 .orElseThrow(() -> new UnexpectedTokenException(types, lexer.slice(5), lexer.line(), lexer.column()));
     }
 
-    private Token peek(TokenType... types) throws UnexpectedTokenException {
-        Token token = consume(types);
-        lexer.returnToken(token);
-        return token;
+    private Optional<Token> peek(TokenType... types) throws UnexpectedTokenException {
+        try {
+            lexer.backup();
+            Token token = consume(types);
+            lexer.returnToken(token);
+            return Optional.of(token);
+        } catch (UnexpectedTokenException e) {
+            lexer.restore();
+            return Optional.empty();
+        }
     }
 
     @FunctionalInterface
-    private interface ProductionRule {
+    public interface ProductionRule {
         CST apply() throws UnexpectedTokenException;
     }
 
@@ -55,6 +62,8 @@ public class Parser {
             } catch (UnexpectedTokenException e) {
                 lexer.restore();
                 exceptions.addAll(e.expected());
+            } finally {
+                lexer.commit();
             }
         }
         throw new UnexpectedTokenException(exceptions, lexer.slice(5), lexer.line(), lexer.column());
@@ -62,6 +71,7 @@ public class Parser {
 
     /**
      * Construct ::= Struct | Trait | Enum | VarDecl | Function
+     *
      * @return CST
      * @see #parseStruct()
      * @see #parseTrait()
@@ -69,21 +79,23 @@ public class Parser {
      * @see #parseFunction()
      */
     private CST parseConstruct() throws UnexpectedTokenException {
-        Token token = peek(TokenType.STRUCT, TokenType.TRAIT, TokenType.ENUM);
-        switch (token.type()) {
-            case STRUCT:
-                return parseStruct();
-            case TRAIT:
-                return parseTrait();
-            case ENUM:
-                return parseEnum();
-            default:
-                return parseFunction();
+        Optional<Token> token = peek(TokenType.STRUCT, TokenType.TRAIT, TokenType.ENUM);
+
+        if (token.isEmpty()) {
+            return parseFunction();
         }
+
+        return switch (token.get().type()) {
+            case STRUCT -> parseStruct();
+            case TRAIT -> parseTrait();
+            case ENUM -> parseEnum();
+            default -> null;
+        };
     }
 
     /**
-     * Type ::= Identifier | Identifier '<' '>' | Identifier '<' GenericTypes '>'
+     * Type ::= Identifier | Identifier '<' '>' | Identifier '<' GenericTypes '>' | Type '*'
+     *
      * @return CST
      * @see #parseGenericTypes(CST)
      */
@@ -93,7 +105,6 @@ public class Parser {
             lexer.backup();
             CST node = new CST(consume(TokenType.LESS));
             try {
-                lexer.backup();
                 parseGenericTypes(node);
             } catch (UnexpectedTokenException e) {
                 lexer.restore();
@@ -102,12 +113,21 @@ public class Parser {
             root.child(node);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
+
+        CST current = root;
+        while (peek(TokenType.STAR).isPresent()) {
+            current = current.child(consume(TokenType.STAR));
+        }
+
         return root;
     }
 
     /**
      * GenericTypes ::= Type | Type ',' GenericTypes
+     *
      * @param parent CST
      * @see #parseType()
      */
@@ -119,18 +139,23 @@ public class Parser {
             parseGenericTypes(parent);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
     }
 
     /**
      * InheritedType ::= Type ':' GenericTypes
+     *
+     * @return CST
+     * @see #parseType()
+     * @see #parseGenericTypes(CST)
      */
     private CST parseInheritedType() throws UnexpectedTokenException {
         CST root = parseType();
         try {
             lexer.backup();
-            root.child(consume(TokenType.COLON));
-            parseGenericTypes(root);
+            parseGenericTypes(root.child(consume(TokenType.COLON)));
         } catch (UnexpectedTokenException e) {
             lexer.restore();
         }
@@ -139,6 +164,7 @@ public class Parser {
 
     /**
      * Struct ::= STRUCT Type '{' Fields '}' | STRUCT InheritedType '{' Fields '}'
+     *
      * @return CST
      * @see #parseType()
      * @see #parseInheritedType()
@@ -148,20 +174,26 @@ public class Parser {
         CST root = new CST(consume(TokenType.STRUCT));
         CST body = root.child(parseInheritedType()).child(consume(TokenType.LEFT_BRACE));
         try {
-            parseOneOf(() ->{
+            lexer.backup();
+            parseOneOf(() -> {
                 parseFunctions(body);
                 return body;
             }, () -> {
                 parseFields(body);
                 return body;
             });
-        } catch (UnexpectedTokenException ignored) {}
+        } catch (UnexpectedTokenException e) {
+            lexer.restore();
+        } finally {
+            lexer.commit();
+        }
         body.child(consume(TokenType.RIGHT_BRACE));
         return root;
     }
 
     /**
      * Field ::= Type Identifier
+     *
      * @return CST
      * @see #parseType()
      */
@@ -173,6 +205,7 @@ public class Parser {
 
     /**
      * Fields ::= Field ';' | Field ';' Fields
+     *
      * @param parent CST
      * @see #parseField()
      */
@@ -185,11 +218,14 @@ public class Parser {
             parseFields(parent);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
     }
 
     /**
      * Trait ::= TRAIT Type '{' FuncSigs '}' | TRAIT InheritedType '{' FuncSigs '}'
+     *
      * @return CST
      * @see #parseType()
      * @see #parseInheritedType()
@@ -203,6 +239,8 @@ public class Parser {
             parseFuncSigs(body);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
         body.child(consume(TokenType.RIGHT_BRACE));
         return root;
@@ -210,6 +248,7 @@ public class Parser {
 
     /**
      * Parameters ::= Type Identifier | Type Identifier ',' Parameters
+     *
      * @param parent
      * @throws UnexpectedTokenException
      */
@@ -228,25 +267,29 @@ public class Parser {
 
     /**
      * Method ::= Type Identifier '(' Parameters ')'
+     *
      * @return CST
      * @see #parseType()
      * @see #parseParameters(CST)
      */
     private CST parseFuncSig() throws UnexpectedTokenException {
         CST root = parseType();
-        root.child(consume(TokenType.IDENTIFIER)).child(consume(TokenType.LEFT_PAREN));
+        CST current = root.child(consume(TokenType.IDENTIFIER)).child(consume(TokenType.LEFT_PAREN));
         try {
             lexer.backup();
-            parseParameters(root);
+            parseParameters(current);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
-        root.child(consume(TokenType.RIGHT_PAREN));
+        current.child(consume(TokenType.RIGHT_PAREN));
         return root;
     }
 
     /**
      * Methods ::= Method ';' | Method ';' Methods
+     *
      * @param parent CST
      * @see #parseFuncSig()
      */
@@ -259,11 +302,14 @@ public class Parser {
             parseFuncSigs(parent);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
     }
 
     /**
      * Enum ::= ENUM Identifier '{' EnumValues '}'
+     *
      * @return CST
      */
     private CST parseEnum() throws UnexpectedTokenException {
@@ -274,6 +320,8 @@ public class Parser {
             parseEnumValues(root);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
         root.child(consume(TokenType.RIGHT_BRACE));
         return root;
@@ -281,6 +329,7 @@ public class Parser {
 
     /**
      * EnumValue ::= Identifier | Identifier '=' Integer
+     *
      * @param parent CST
      */
     private void parseEnumValue(CST parent) throws UnexpectedTokenException {
@@ -290,12 +339,15 @@ public class Parser {
             root.child(consume(TokenType.EQUAL)).child(consume(TokenType.INTEGER));
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
         parent.child(root);
     }
 
     /**
      * EnumValues ::= EnumValue | EnumValue ',' EnumValues
+     *
      * @param parent CST
      * @see #parseEnumValue(CST)
      */
@@ -307,23 +359,35 @@ public class Parser {
             parseEnumValues(parent);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
     }
 
     /**
      * Function ::= FuncSig Block
+     *
      * @return CST
      * @see #parseFuncSig()
      * @see #parseBlock()
      */
     private CST parseFunction() throws UnexpectedTokenException {
-        CST root = parseFuncSig();
-        root.child(parseBlock());
-        return root;
+        try {
+            lexer.backup();
+            CST root = parseFuncSig();
+            root.ith(0).child(parseBlock());
+            return root;
+        } catch (UnexpectedTokenException e) {
+            lexer.restore();
+            throw e;
+        } finally {
+            lexer.commit();
+        }
     }
 
     /**
      * Functions ::= Function | Function Functions
+     *
      * @param parent CST
      * @see #parseFunction()
      */
@@ -335,11 +399,14 @@ public class Parser {
             parseFunctions(parent);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
     }
 
     /**
      * Block ::= '{' Statements '}'
+     *
      * @return CST
      * @see #parseStatements(CST)
      */
@@ -350,6 +417,8 @@ public class Parser {
             parseStatements(root);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
         root.child(consume(TokenType.RIGHT_BRACE));
         return root;
@@ -357,6 +426,7 @@ public class Parser {
 
     /**
      * Statement ::= Block | If | While | For | Do | BREAK ';' | CONTINUE ';' | Return | Defer | Expression ';'
+     *
      * @see #parseBlock()
      * @see #parseIf()
      * @see #parseWhile()
@@ -367,8 +437,15 @@ public class Parser {
      * @see #parseExpression()
      */
     private CST parseStatement() throws UnexpectedTokenException {
-        Token token = peek(TokenType.LEFT_BRACE, TokenType.IF, TokenType.WHILE, TokenType.FOR, TokenType.DO, TokenType.BREAK, TokenType.CONTINUE, TokenType.RETURN, TokenType.DEFER);
-        switch (token.type()) {
+        Optional<Token> token = peek(TokenType.LEFT_BRACE, TokenType.IF, TokenType.WHILE, TokenType.FOR, TokenType.DO, TokenType.BREAK, TokenType.CONTINUE, TokenType.RETURN, TokenType.DEFER);
+
+        if (token.isEmpty()) {
+            CST root = parseExpression();
+            root.child(consume(TokenType.SEMICOLON));
+            return root;
+        }
+
+        switch (token.get().type()) {
             case LEFT_BRACE:
                 return parseBlock();
             case IF:
@@ -393,16 +470,14 @@ public class Parser {
                 return parseReturn();
             case DEFER:
                 return parseDefer();
-            default: {
-                CST expr = parseExpression();
-                expr.child(consume(TokenType.SEMICOLON));
-                return expr;
-            }
+            default:
+                return null;
         }
     }
 
     /**
      * Statements ::= Statement | Statement Statements
+     *
      * @param parent CST
      * @see #parseStatement()
      */
@@ -413,11 +488,14 @@ public class Parser {
             parseStatements(parent);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
     }
 
     /**
      * If ::= IF '(' Expression ')' Statement | IF '(' Expression ')' Statement ELSE Statement
+     *
      * @return CST
      * @see #parseExpression()
      * @see #parseStatement()
@@ -431,12 +509,15 @@ public class Parser {
             root.child(consume(TokenType.ELSE)).child(parseStatement());
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
         return root;
     }
 
     /**
      * While ::= WHILE '(' Expression ')' Statement
+     *
      * @return CST
      * @see #parseExpression()
      * @see #parseStatement()
@@ -450,6 +531,7 @@ public class Parser {
 
     /**
      * For ::= FOR '(' VarDecl ';' Expression ';' ForUpdate ')' Statement
+     *
      * @return CST
      * @see #parseVarDecl()
      * @see #parseExpression()
@@ -465,12 +547,14 @@ public class Parser {
     }
 
     /**
-     * VarAssign ::= Identifier '=' Expression
+     * VarAssign ::= Path '=' Expression
+     *
      * @return CST
+     * @see #parsePath()
      * @see #parseExpression()
      */
     private CST parseVarAssign() throws UnexpectedTokenException {
-        CST root = new CST(consume(TokenType.IDENTIFIER));
+        CST root = parsePath();
         root.child(consume(TokenType.EQUAL));
         root.child(parseExpression());
         return root;
@@ -478,6 +562,7 @@ public class Parser {
 
     /**
      * VarAssignChain ::= VarAssign | VarAssign ',' VarAssignChain
+     *
      * @param parent CST
      * @see #parseVarAssign()
      */
@@ -490,11 +575,14 @@ public class Parser {
             parseVarAssignChain(parent);
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
     }
 
     /**
      * VarDecl ::= Type Identifier | Type VarAssignChain
+     *
      * @return CST
      * @see #parseType()
      */
@@ -506,12 +594,15 @@ public class Parser {
         } catch (UnexpectedTokenException e) {
             lexer.restore();
             root.child(consume(TokenType.IDENTIFIER));
+        } finally {
+            lexer.commit();
         }
         return root;
     }
 
     /**
      * Do ::= DO Statement WHILE '(' Expression ')' ';'
+     *
      * @return CST
      * @see #parseStatement()
      * @see #parseExpression()
@@ -525,6 +616,7 @@ public class Parser {
 
     /**
      * Return ::= RETURN Expression ';'
+     *
      * @return CST
      * @see #parseExpression()
      */
@@ -536,6 +628,7 @@ public class Parser {
 
     /**
      * Defer ::= DEFER Statement
+     *
      * @return CST
      * @see #parseStatement()
      */
@@ -547,6 +640,7 @@ public class Parser {
 
     /**
      * Expression ::= Term | VarAssign | Expression BinaryOp Expression | UnaryOp Expression
+     *
      * @return CST
      * @see #parseVarAssign()
      * @see #parseBinaryOp()
@@ -560,25 +654,31 @@ public class Parser {
             root.child(parseBinaryOp()).child(parseExpression());
         } catch (UnexpectedTokenException e) {
             lexer.restore();
+        } finally {
+            lexer.commit();
         }
         return root;
     }
 
     /**
      * Term ::= Integer | Float | Identifier | '(' Expression ')'
+     *
      * @return CST
      */
     private CST parseTerm() throws UnexpectedTokenException {
         return parseOneOf(
                 () -> new CST(consume(TokenType.INTEGER)),
                 () -> new CST(consume(TokenType.FLOAT)),
-                () -> new CST(consume(TokenType.IDENTIFIER)),
-                () -> new CST(consume(TokenType.LEFT_PAREN)).child(parseExpression()).child(consume(TokenType.RIGHT_PAREN))
+                () -> new CST(consume(TokenType.LEFT_PAREN)).child(parseExpression()).child(consume(TokenType.RIGHT_PAREN)),
+                this::parseFuncCall,
+                this::parsePath,
+                () -> new CST(consume(TokenType.IDENTIFIER))
         );
     }
 
     /**
      * BinaryOp ::= '+' | '-' | '*' | '/' | '%' | '&' | '|' | '^' | '~' | '<<' | '>>' | '>>>' | '==' | '!=' | '<' | '<=' | '>' | '>='
+     *
      * @return CST
      */
     private CST parseBinaryOp() throws UnexpectedTokenException {
@@ -590,10 +690,87 @@ public class Parser {
 
     /**
      * UnaryOp ::= '+' | '-' | '!' | '~'
+     *
      * @return CST
      */
     private CST parseUnaryOp() throws UnexpectedTokenException {
         return new CST(consume(TokenType.PLUS, TokenType.MINUS, TokenType.EXCLAMATION, TokenType.TILDE));
+    }
+
+    /**
+     * Path ::= Identifier | '.' Identifier | Identifier '.' Path
+     *
+     * @return CST
+     */
+    private CST parsePath(boolean dot) throws UnexpectedTokenException {
+        Token token = dot ? consume(TokenType.IDENTIFIER, TokenType.DOT) : consume(TokenType.IDENTIFIER);
+        CST root = new CST(token);
+        CST current = root;
+
+        if (dot && token.type() == TokenType.DOT) {
+            current = current.child(consume(TokenType.IDENTIFIER));
+        }
+
+        try {
+            lexer.backup();
+            current.child(consume(TokenType.DOT)).child(parsePath(false));
+        } catch (UnexpectedTokenException e) {
+            lexer.restore();
+        } finally {
+            lexer.commit();
+        }
+
+        return root;
+    }
+
+    private CST parsePath() throws UnexpectedTokenException {
+        return parsePath(true);
+    }
+
+    /**
+     * FuncCall ::= Path '(' Arguments ')'
+     *
+     * @return CST
+     * @see #parsePath()
+     * @see #parseArguments(CST)
+     */
+    private CST parseFuncCall() throws UnexpectedTokenException {
+        CST root = parsePath();
+        CST current = root;
+        while (current.ith(0) != null) {
+            current = current.ith(0);
+        }
+        current = current.child(consume(TokenType.LEFT_PAREN));
+        try {
+            lexer.backup();
+            parseArguments(current);
+        } catch (UnexpectedTokenException e) {
+            lexer.restore();
+        } finally {
+            lexer.commit();
+        }
+        current.child(consume(TokenType.RIGHT_PAREN));
+        return root;
+    }
+
+    /**
+     * Arguments ::= Expression | Expression ',' Arguments
+     *
+     * @param parent CST
+     * @see #parseExpression()
+     */
+    private void parseArguments(CST parent) throws UnexpectedTokenException {
+        CST argument = parseExpression();
+        parent.child(argument);
+        try {
+            lexer.backup();
+            parent.child(consume(TokenType.COMMA));
+            parseArguments(parent);
+        } catch (UnexpectedTokenException e) {
+            lexer.restore();
+        } finally {
+            lexer.commit();
+        }
     }
 
 }

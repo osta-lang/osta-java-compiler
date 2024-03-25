@@ -193,7 +193,11 @@ public class Lexer implements AutoCloseable {
     }
 
     public void restore() {
-        buffer.position(backup.pop());
+        buffer.position(backup.peek());
+    }
+
+    public void commit() {
+        backup.pop();
     }
 
     public void returnToken(Token token) {

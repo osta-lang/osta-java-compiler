@@ -4,7 +4,6 @@ import org.osta.lex.token.Token;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class CST {
 
