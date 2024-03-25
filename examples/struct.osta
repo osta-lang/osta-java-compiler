@@ -1,0 +1,17 @@
+struct Foo {
+    u32 bar;
+}
+
+struct Foo1<T> {
+    T bar;
+}
+
+struct Foo2<T, U> {
+    T bar;
+    U baz;
+}
+
+struct Foo3<K, V> {
+    Map<K,V> bar;
+    Map<K,List<V>> baz;
+}

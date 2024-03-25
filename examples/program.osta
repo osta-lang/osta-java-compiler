@@ -1,0 +1,23 @@
+trait Value<T>
+{
+    T get();
+    void set(T value);
+}
+
+struct Wrapper<T>
+{
+    T value;
+}
+
+struct ValueWrapper<T> : Wrapper<T>, Value<T>
+{
+    T get() { return .value; }
+    void set(T value) { .value = value; }
+}
+
+int main(u32 argc, u8** argv)
+{
+    ValueWrapper<u32> vw;
+    vw.set(42);
+    return vw.get();
+}
