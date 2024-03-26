@@ -8,16 +8,18 @@ import java.util.List;
 public class CST {
 
     private final Token token;
+    private final Type type;
     private final List<CST> children = new ArrayList<>();
     private CST interest;
 
-    public CST(Token token, CST interest) {
+    public CST(Token token, Type type, CST interest) {
         this.token = token;
+        this.type = type;
         this.interest = interest;
     }
 
-    public CST(Token token) {
-        this(token, null);
+    public CST(Token token, Type type) {
+        this(token, type, null);
     }
 
     public CST child(CST cst) {
@@ -28,8 +30,8 @@ public class CST {
         return cst;
     }
 
-    public CST child(Token token) {
-        return child(new CST(token));
+    public CST child(Token token, Type type) {
+        return child(new CST(token, type));
     }
 
     public CST ith(int i) {
@@ -74,7 +76,7 @@ public class CST {
             } else {
                 builder.append(" [label=\"ROOT");
             }
-            builder.append("\"]\n");
+            builder.append(", type=").append(node.type).append("\"]\n");
 
             for (CST child : node.children) {
                 builder.append(node.hashCode()).append(" -> ").append(child.hashCode()).append("\n");
@@ -83,5 +85,24 @@ public class CST {
             pending.addAll(node.children);
         }
         return builder.toString();
+    }
+
+    public CST as(Type type) {
+        CST node = new CST(token, type, this);
+        node.children.addAll(children);
+        return node;
+    }
+
+    public enum Type {
+        TOKEN,
+        ROOT,
+        PROGRAM,
+        IDENTIFIER,
+        TYPE,
+        STRUCT,
+        TRAIT,
+        ENUM,
+        CONTROL,
+        TERM
     }
 }
