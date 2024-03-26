@@ -713,11 +713,15 @@ public class Parser {
 
         try {
             lexer.backup();
-            current.child(consume(TokenType.DOT)).child(parsePath(false));
+            current.interest(current.child(consume(TokenType.DOT)).child(parsePath()).interest());
         } catch (UnexpectedTokenException e) {
             lexer.restore();
         } finally {
             lexer.commit();
+        }
+
+        if (root.interest() == null) {
+            root.interest(current);
         }
 
         return root;
@@ -736,11 +740,7 @@ public class Parser {
      */
     private CST parseFuncCall() throws UnexpectedTokenException {
         CST root = parsePath();
-        CST current = root;
-        while (current.ith(0) != null) {
-            current = current.ith(0);
-        }
-        current = current.child(consume(TokenType.LEFT_PAREN));
+        CST current = root.child(consume(TokenType.LEFT_PAREN));
         try {
             lexer.backup();
             parseArguments(current);

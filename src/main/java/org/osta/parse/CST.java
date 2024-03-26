@@ -9,12 +9,21 @@ public class CST {
 
     private final Token token;
     private final List<CST> children = new ArrayList<>();
+    private CST interest;
+
+    public CST(Token token, CST interest) {
+        this.token = token;
+        this.interest = interest;
+    }
 
     public CST(Token token) {
-        this.token = token;
+        this(token, null);
     }
 
     public CST child(CST cst) {
+        if (interest != null && interest != this) {
+            return interest.child(cst);
+        }
         children.add(cst);
         return cst;
     }
@@ -34,6 +43,18 @@ public class CST {
         }
 
         return children.get(i);
+    }
+
+    public CST interest() {
+        return interest;
+    }
+
+    public void interest(CST interest) {
+        this.interest = interest;
+    }
+
+    public Token token() {
+        return token;
     }
 
     @Override
