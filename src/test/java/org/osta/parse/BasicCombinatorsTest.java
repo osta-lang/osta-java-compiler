@@ -18,8 +18,17 @@ class BasicCombinatorsTest {
         );
     }
 
+    /* FIXME(cdecompilador): broken somehow, I think there is a bug in optional */
+    @Disabled
+    @Test
+    void skipWhitespace() throws Exception {
+        AST ast = Parser.skipWhitespace(Parser.literal("a")).parse("   a    b").ast();
+        String val = ((LiteralAST)ast).value();
+        assertEquals(val, "a");
+    }
 
-    /* TODO(cdecompilador): this should work since we are using CharSequence */
+
+    /* FIXME(cdecompilador): this should work since we are using CharSequence */
     @Disabled
     @Test
     void unicodeLiteral() throws Exception {

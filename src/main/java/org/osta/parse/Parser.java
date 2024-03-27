@@ -8,10 +8,9 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@FunctionalInterface
 public interface Parser {
 
-    ParseResult parse(CharSequence input) throws ParseException;
+    public ParseResult parse(CharSequence input) throws ParseException;
 
     static Parser test(Parser parser, Predicate<AST> predicate, Supplier<ParseException> exceptionSupplier) {
         return input -> {
@@ -124,9 +123,26 @@ public interface Parser {
     static Parser regex(@NotNull String regex, @NotNull String message) {
         return regex(regex, () -> new ParseException(message));
     }
-    
-    public static IntLiteralAST simpleIntegerMap(RegexAST regex) {
-        return new IntLiteralAST(Integer.parseInt(regex.value()));
+
+    static Parser surroundedBy(Parser inner, Parser surrounder) {
+        return map(
+                sequence(surrounder, inner, surrounder),
+                (AST ast) -> ((SequenceAST)ast).value()[1]
+        );
+    }
+
+    static Parser skipWhitespace(Parser inner) {
+        return surroundedBy(inner, optional(sequence(test(
+                item(),
+                (AST ast) -> {
+                    switch (((ItemAST)ast).value()) {
+                        case ' ': case '\t': case '\b': case '\n':
+                            return true;
+                    }
+                    return false;
+                },
+                ""
+        ))));
     }
 
     static Parser integer() {
