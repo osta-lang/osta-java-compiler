@@ -22,7 +22,6 @@ public final class IntLiteralAST extends FactorExprAST {
                 Parser.regex("[+-]?0[oO][0-7]+", "Expected an integer"),
                 Parser.regex("[+-]?0[xX][0-9a-fA-F]+", "Expected an integer")
         ), (AST ast) -> {
-            // FIXME(cdecompilador): this is bad, we may need to refactor ParseResult
             RegexAST r = (RegexAST)ast;
             if (r.groups().length > 0) {
                 return new IntLiteralAST(Integer.parseInt(r.value()));

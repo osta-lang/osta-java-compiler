@@ -19,13 +19,7 @@ public class ExprAST implements AST {
                                 Parser.lazy(ExprAST::parser),
                                 Parser.literal(")")
                         )),
-                        (SequenceAST ast) -> {
-                            /* TODO(cdecompilador): Maybe add here an annotation Expr to tell that this one has maximum
-                             * precedence since it goes inside parethesis, such that the visior that does the AST
-                             * reordering can take them into account
-                             */
-                            return ast.values().get(1);
-                        }
+                        (SequenceAST ast) -> ast.values().get(1)
                 )
         );
     }
