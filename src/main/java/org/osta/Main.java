@@ -27,6 +27,9 @@ public class Main {
             System.out.println(ilGenerator.generate());
         } catch (ParseException e) {
             throw new RuntimeException(e);
+        } finally {
+            channel.close();
+            file.close();
         }
     }
 
