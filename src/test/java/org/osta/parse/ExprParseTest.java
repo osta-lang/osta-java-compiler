@@ -10,7 +10,7 @@ public class ExprParseTest {
 
     @Test
     void simple() throws ParseException {
-        BinaryExprAST firstAst = (BinaryExprAST) BinaryExprAST.parser().parse("0+(1*a)").ast();
+        BinaryExprAST firstAst = (BinaryExprAST) BinaryExprAST.parser().parse(" 0 + ( 1 * a ) ").ast();
         IntLiteralAST num1 = (IntLiteralAST) firstAst.left();
         BinaryExprAST secondAst = (BinaryExprAST) firstAst.right();
         IntLiteralAST num2 = (IntLiteralAST) secondAst.left();

@@ -14,11 +14,11 @@ public class ExprAST implements AST {
                 BinaryExprAST.parser(),
                 FactorExprAST.parser(),
                 Parser.map(
-                        Parser.sequence(
+                        Parser.skipWhitespace(Parser.sequence(
                                 Parser.literal("("),
                                 (input) -> ExprAST.parser().parse(input),
                                 Parser.literal(")")
-                        ),
+                        )),
                         (AST ast) -> {
                             /* TODO(cdecompilador): Maybe add here an annotation Expr to tell that this one has maximum
                              * precedence since it goes inside parethesis, such that the visior that does the AST
