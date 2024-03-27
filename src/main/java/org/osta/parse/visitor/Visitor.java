@@ -10,6 +10,6 @@ public interface Visitor {
 
     void visit(RegexAST ast);
 
-    void visit(IntLiteralAST ast);
+    void visit(ExprAST ast);
 
 }

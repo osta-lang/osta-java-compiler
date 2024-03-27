@@ -22,7 +22,7 @@ public class ILGenerator implements Visitor {
     }
 
     @Override 
-    public void visit(IntLiteralAST ast) {
+    public void visit(ExprAST ast) {
         // TODO
     }
 

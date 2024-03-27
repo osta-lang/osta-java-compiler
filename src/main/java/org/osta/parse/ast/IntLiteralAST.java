@@ -1,12 +1,15 @@
 package org.osta.parse.ast;
 
-import org.osta.parse.visitor.Visitor;
+import java.util.Objects;
 
-public record IntLiteralAST(Integer value) implements AST {
+public final class IntLiteralAST extends ExprAST {
+    private final Integer value;
 
-    @Override
-    public void accept(Visitor visitor) {
-        visitor.visit(this);
+    public IntLiteralAST(Integer value) {
+        this.value = value;
     }
-      
+
+    public Integer value() {
+        return value;
+    }
 }
