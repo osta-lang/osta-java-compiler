@@ -67,9 +67,9 @@ public class BinaryExprAST extends ExprAST {
                 ),
                 (AST ast) -> {
                     SequenceAST sequenceAst = (SequenceAST) ast;
-                    ExprAST left = (ExprAST) sequenceAst.value()[0];
-                    LiteralAST op = (LiteralAST) sequenceAst.value()[1];
-                    ExprAST right = (ExprAST) sequenceAst.value()[2];
+                    ExprAST left = (ExprAST) sequenceAst.values().get(0);
+                    LiteralAST op = (LiteralAST) sequenceAst.values().get(1);
+                    ExprAST right = (ExprAST) sequenceAst.values().get(2);
 
                     return new BinaryExprAST(left, BinaryOp.from(op.value()), right);
                 }

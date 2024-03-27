@@ -25,7 +25,7 @@ public class ExprAST implements AST {
                              * reordering can take them into account
                              */
                             SequenceAST sequenceAst = (SequenceAST)ast;
-                            return sequenceAst.value()[1];
+                            return sequenceAst.values().get(1);
                         }
                 )
         );

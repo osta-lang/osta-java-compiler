@@ -3,6 +3,8 @@ package org.osta.parse;
 import org.jetbrains.annotations.NotNull;
 import org.osta.parse.ast.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -32,14 +34,13 @@ public interface Parser {
         }
 
         return input -> {
-            CharSequence rest = input;
-            AST[] asts = new AST[parsers.length];
+            List<AST> asts = new ArrayList<>(parsers.length);
             for (int i = 0; i < parsers.length; i++) {
-                ParseResult result = parsers[i].parse(rest);
-                asts[i] = result.ast();
-                rest = result.rest();
+                ParseResult result = parsers[i].parse(input);
+                asts.add(result.ast());
+                input = result.rest();
             }
-            return new ParseResult(new SequenceAST(asts), rest);
+            return new ParseResult(new SequenceAST(asts), input);
         };
     }
 
@@ -81,6 +82,36 @@ public interface Parser {
             var result = parser.parse(input);
             return new ParseResult(map.fn(result.ast()), result.rest());
         };
+    }
+
+    static Parser zeroOrMore(Parser parser) {
+        return input -> {
+            var asts = new ArrayList<AST>();
+
+            while (true) {
+                try {
+                    ParseResult result = parser.parse(input);
+                    asts.add(result.ast());
+                    input = result.rest();
+                } catch (Exception e) {
+                    break;
+                }
+            }
+
+            return new ParseResult(new SequenceAST(asts), input);
+        };
+    }
+
+    static Parser oneOrMore(Parser parser) {
+        return map(sequence(parser, oneOrMore(parser)),
+                (AST ast) -> {
+                    SequenceAST sequenceAst = (SequenceAST) ast;
+                    AST head = sequenceAst.values().get(0);
+                    SequenceAST tail = ((SequenceAST) sequenceAst.values().get(1));
+                    tail.values().add(0, head);
+
+                    return tail;
+                });
     }
 
     static Parser item() {
@@ -127,12 +158,12 @@ public interface Parser {
     static Parser surroundedBy(Parser inner, Parser surrounder) {
         return map(
                 sequence(surrounder, inner, surrounder),
-                (AST ast) -> ((SequenceAST)ast).value()[1]
+                (AST ast) -> ((SequenceAST) ast).values().get(1)
         );
     }
 
     static Parser skipWhitespace(Parser inner) {
-        return surroundedBy(inner, optional(sequence(test(
+        return surroundedBy(inner, zeroOrMore(test(
                 item(),
                 (AST ast) -> {
                     switch (((ItemAST)ast).value()) {
@@ -142,7 +173,7 @@ public interface Parser {
                     return false;
                 },
                 ""
-        ))));
+        )));
     }
 
     static Parser integer() {
