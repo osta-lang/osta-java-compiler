@@ -21,6 +21,11 @@ public class ILGenerator implements Visitor {
         sb.append(ast.value());
     }
 
+    @Override 
+    public void visit(IntLiteralAST ast) {
+        // TODO
+    }
+
     public String generate() {
         return sb.toString();
     }

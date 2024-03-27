@@ -72,6 +72,18 @@ public interface Parser {
         };
     }
 
+    @FunctionalInterface
+    public interface ParserMapLambda {
+        public AST fn(AST value);
+    }
+
+    static Parser map(Parser parser, ParserMapLambda map) {
+        return input -> {
+            var result = parser.parse(input);
+            return new ParseResult(map.fn(result.ast()), result.rest());
+        };
+    }
+
     static Parser item() {
         return input -> {
             if (input.isEmpty()) {
@@ -112,16 +124,28 @@ public interface Parser {
     static Parser regex(@NotNull String regex, @NotNull String message) {
         return regex(regex, () -> new ParseException(message));
     }
+    
+    public static IntLiteralAST simpleIntegerMap(RegexAST regex) {
+        return new IntLiteralAST(Integer.parseInt(regex.value()));
+    }
 
     static Parser integer() {
         return oneOf(
-                regex("([+-]?\\d+)(?:[eE](\\+?\\d+))?", "Expected an integer"),
-                regex("[+-]?0[bB][01]+", "Expected an integer"),
-                regex("[+-]?0[oO][0-7]+", "Expected an integer"),
-                regex("[+-]?0[xX][0-9a-fA-F]+", "Expected an integer")
+                /* FIXME(cdecompilador): this is bad, we may need to refactor ParseResult */
+                map(regex("[+-]?(0|[1-9][0-9]*)", "Excepted integer"), (AST ast) -> {
+                    RegexAST r = (RegexAST)ast;
+                    return new IntLiteralAST(Integer.parseInt(r.value()));
+                })
+                    /* TODO(cdecompilador): convert to IntLiteralAST
+                    regex("([+-]?\\d+)(?:[eE](\\+?\\d+))?", "Expected an integer"),
+                    regex("[+-]?0[bB][01]+", "Expected an integer"),
+                    regex("[+-]?0[oO][0-7]+", "Expected an integer"),
+                    regex("[+-]?0[xX][0-9a-fA-F]+", "Expected an integer")
+                    */
         );
     }
 
+    /* TODO: Add the FloatLiteral type
     static Parser decimal() {
         return sequence(
                 oneOf(
@@ -136,4 +160,5 @@ public interface Parser {
                 )
         );
     }
+    */
 }

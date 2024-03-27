@@ -1,8 +1,6 @@
 package org.osta.parse.visitor;
 
-import org.osta.parse.ast.ItemAST;
-import org.osta.parse.ast.LiteralAST;
-import org.osta.parse.ast.RegexAST;
+import org.osta.parse.ast.*;
 
 public interface Visitor {
 
@@ -11,4 +9,7 @@ public interface Visitor {
     void visit(LiteralAST ast);
 
     void visit(RegexAST ast);
+
+    void visit(IntLiteralAST ast);
+
 }
