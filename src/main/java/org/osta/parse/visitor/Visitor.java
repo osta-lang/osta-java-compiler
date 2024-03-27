@@ -12,4 +12,5 @@ public interface Visitor {
 
     void visit(ExprAST ast);
 
+    void visit(StmtAST stmtAST);
 }

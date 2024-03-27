@@ -2,7 +2,7 @@ package org.osta.parse.ast;
 
 import org.osta.parse.Parser;
 
-public class IdentifierAST extends FactorExprAST {
+public class IdentifierAST extends ExprAST {
 
     private final String identifier;
 

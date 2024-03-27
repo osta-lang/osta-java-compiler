@@ -26,6 +26,11 @@ public class ILGenerator implements Visitor {
         // TODO
     }
 
+    @Override
+    public void visit(StmtAST stmtAST) {
+        // TODO
+    }
+
     public String generate() {
         return sb.toString();
     }
