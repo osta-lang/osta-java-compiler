@@ -62,7 +62,8 @@ public class BinaryExprAST extends ExprAST {
                                 Parser.literal("/"),
                                 Parser.literal("%")
                         ),
-                        ExprAST.parser()
+                        /* We can't put here directly ExprAST.parser(), since that way recursion won't be lazy */
+                        (CharSequence input) -> ExprAST.parser().parse(input)
                 ),
                 (AST ast) -> {
                     SequenceAST sequenceAst = (SequenceAST) ast;

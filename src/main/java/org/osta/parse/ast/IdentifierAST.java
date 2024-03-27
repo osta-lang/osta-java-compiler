@@ -10,10 +10,14 @@ public class IdentifierAST extends FactorExprAST {
         this.identifier = identifier;
     }
 
+    public String identifier() {
+        return identifier;
+    }
+
     // TODO
     public static Parser parser() {
         return Parser.map(
-                Parser.regex("[_a-zA-Z][_a-zA-Z0-9]+", "Invalid identifier"),
+                Parser.regex("[_a-zA-Z][_a-zA-Z0-9]*", "Invalid identifier"),
                 (AST ast) -> new IdentifierAST(((RegexAST)ast).value())
         );
     }

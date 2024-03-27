@@ -12,8 +12,8 @@ public class ExprAST implements AST {
     public static Parser parser() {
         return Parser.oneOf(
                 BinaryExprAST.parser(),
-                FactorExprAST.parser(),
-                Parser.sequence(Parser.literal("("), ExprAST.parser(), Parser.literal(")"))
+                FactorExprAST.parser()
+                // Parser.sequence(Parser.literal("("), ExprAST.parser(), Parser.literal(")"))
         );
     }
 }
