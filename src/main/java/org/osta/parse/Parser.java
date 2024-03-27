@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 @FunctionalInterface
 public interface Parser {
+
     ParseResult parse(CharSequence input) throws ParseException;
 
     static Parser test(Parser parser, Predicate<AST> predicate, Supplier<ParseException> exceptionSupplier) {
@@ -88,6 +89,7 @@ public interface Parser {
             if (input.subSequence(0, literal.length()).toString().equals(literal)) {
                 return new ParseResult(new LiteralAST(literal), input.subSequence(literal.length(), input.length()));
             }
+
             throw ParseException.EXPECTED_LITERAL(literal);
         };
     }
