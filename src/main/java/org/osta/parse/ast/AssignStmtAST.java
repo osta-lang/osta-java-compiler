@@ -13,15 +13,12 @@ public class AssignStmtAST extends StmtAST {
         this.value = value;
     }
 
-    public static Parser parser() {
+    public static Parser<AssignStmtAST> $parser() {
         return Parser.map(Parser.sequence(
                     IdentifierAST.parser(), Parser.skipWhitespace(Parser.literal("=")), ExprAST.parser()),
-                (AST ast) -> {
-                    SequenceAST sequenceAST = (SequenceAST) ast;
-                    return new AssignStmtAST(
-                            (IdentifierAST) sequenceAST.values().get(0),
-                            (ExprAST) sequenceAST.values().get(2));
-                }
+                (SequenceAST ast) -> new AssignStmtAST(
+                        (IdentifierAST) ast.values().get(0),
+                        (ExprAST) ast.values().get(2))
         );
     }
 

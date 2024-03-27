@@ -3,6 +3,7 @@ package org.osta;
 import org.osta.parse.ParseException;
 import org.osta.parse.Parser;
 import org.osta.parse.ast.AST;
+import org.osta.parse.ast.IntLiteralAST;
 import org.osta.parse.visitor.ILGenerator;
 import org.osta.text.BufferCharSequence;
 
@@ -20,7 +21,7 @@ public class Main {
         BufferCharSequence input = new BufferCharSequence(buffer);
 
         try {
-            AST ast = Parser.sequence(Parser.literal("hello"), Parser.item(), Parser.integer()).parse(input).ast();
+            AST ast = Parser.sequence(Parser.literal("hello"), Parser.item(), IntLiteralAST.parser()).parse(input).ast();
             ILGenerator ilGenerator = new ILGenerator();
             ast.accept(ilGenerator);
             System.out.println(ilGenerator.generate());

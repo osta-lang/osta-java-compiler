@@ -9,23 +9,22 @@ public class ExprAST implements AST {
         visitor.visit(this);
     }
 
-    public static Parser parser() {
+    public static Parser<ExprAST> parser() {
         return Parser.oneOf(
-                BinaryExprAST.parser(),
-                FactorExprAST.parser(),
+                BinaryExprAST.$parser(),
+                FactorExprAST.$parser(),
                 Parser.map(
                         Parser.skipWhitespace(Parser.sequence(
                                 Parser.literal("("),
-                                (input) -> ExprAST.parser().parse(input),
+                                Parser.lazy(ExprAST::parser),
                                 Parser.literal(")")
                         )),
-                        (AST ast) -> {
+                        (SequenceAST ast) -> {
                             /* TODO(cdecompilador): Maybe add here an annotation Expr to tell that this one has maximum
                              * precedence since it goes inside parethesis, such that the visior that does the AST
                              * reordering can take them into account
                              */
-                            SequenceAST sequenceAst = (SequenceAST)ast;
-                            return sequenceAst.values().get(1);
+                            return ast.values().get(1);
                         }
                 )
         );

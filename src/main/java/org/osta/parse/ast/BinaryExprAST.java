@@ -51,10 +51,10 @@ public class BinaryExprAST extends ExprAST {
         return op;
     }
 
-    public static Parser parser() {
+    public static Parser<BinaryExprAST> $parser() {
         return Parser.map(
                 Parser.sequence(
-                        FactorExprAST.parser(),
+                        FactorExprAST.$parser(),
                         Parser.oneOf(
                                 Parser.literal("+"),
                                 Parser.literal("-"),
@@ -63,13 +63,12 @@ public class BinaryExprAST extends ExprAST {
                                 Parser.literal("%")
                         ),
                         /* We can't put here directly ExprAST.parser(), since that way recursion won't be lazy */
-                        (CharSequence input) -> ExprAST.parser().parse(input)
+                        Parser.lazy(ExprAST::parser)
                 ),
-                (AST ast) -> {
-                    SequenceAST sequenceAst = (SequenceAST) ast;
-                    ExprAST left = (ExprAST) sequenceAst.values().get(0);
-                    LiteralAST op = (LiteralAST) sequenceAst.values().get(1);
-                    ExprAST right = (ExprAST) sequenceAst.values().get(2);
+                (SequenceAST ast) -> {
+                    ExprAST left = (ExprAST) ast.values().get(0);
+                    LiteralAST op = (LiteralAST) ast.values().get(1);
+                    ExprAST right = (ExprAST) ast.values().get(2);
 
                     return new BinaryExprAST(left, BinaryOp.from(op.value()), right);
                 }

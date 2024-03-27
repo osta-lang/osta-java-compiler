@@ -9,6 +9,7 @@ import org.osta.parse.ast.*;
 public class StmtParseTest {
     @Test
     void simple() throws Exception {
-        StmtAST.parser().parse("a = 1 + 1;");
+        StmtAST ast = StmtAST.parser().parse("a = 1 + 1;").ast();
+        assertEquals(AssignStmtAST.class, ast.getClass());
     }
 }

@@ -15,10 +15,10 @@ public class IdentifierAST extends ExprAST {
     }
 
     // TODO
-    public static Parser parser() {
+    public static Parser<IdentifierAST> $parser() {
         return Parser.map(
                 Parser.regex("[_a-zA-Z][_a-zA-Z0-9]*", "Invalid identifier"),
-                (AST ast) -> new IdentifierAST(((RegexAST)ast).value())
+                (RegexAST ast) -> new IdentifierAST(ast.value())
         );
     }
 }

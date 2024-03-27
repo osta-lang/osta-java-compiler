@@ -10,13 +10,21 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public interface Parser {
+public interface Parser<T extends AST> {
 
-    public ParseResult parse(CharSequence input) throws ParseException;
+    ParseResult<T> parse(CharSequence input) throws ParseException;
 
-    static Parser test(Parser parser, Predicate<AST> predicate, Supplier<ParseException> exceptionSupplier) {
+    static Parser<EmptyAST> noop() {
+        return input -> new ParseResult<>(new EmptyAST(), input);
+    }
+
+    static <T extends AST> Parser<T> lazy(Supplier<Parser<T>> supplier) {
+        return input -> supplier.get().parse(input);
+    }
+
+    static <T extends AST> Parser<T> test(Parser<T> parser, Predicate<AST> predicate, Supplier<ParseException> exceptionSupplier) {
         return input -> {
-            ParseResult result = parser.parse(input);
+            ParseResult<T> result = parser.parse(input);
             if (predicate.test(result.ast())) {
                 return result;
             }
@@ -24,36 +32,39 @@ public interface Parser {
         };
     }
 
-    static Parser test(Parser parser, Predicate<AST> predicate, String message) {
+    static <T extends AST> Parser<T> test(Parser<T> parser, Predicate<AST> predicate, String message) {
         return test(parser, predicate, () -> new ParseException(message));
     }
 
-    static Parser sequence(Parser... parsers) {
+    @SafeVarargs
+    static Parser<SequenceAST> sequence(Parser<? extends AST>... parsers) {
         if (parsers.length == 0) {
             throw new IllegalArgumentException("At least one parser must be provided");
         }
 
         return input -> {
             List<AST> asts = new ArrayList<>(parsers.length);
-            for (int i = 0; i < parsers.length; i++) {
-                ParseResult result = parsers[i].parse(input);
+            for (Parser<?> parser : parsers) {
+                ParseResult<?> result = parser.parse(input);
                 asts.add(result.ast());
                 input = result.rest();
             }
-            return new ParseResult(new SequenceAST(asts), input);
+            return new ParseResult<>(new SequenceAST(asts), input);
         };
     }
 
-    static Parser oneOf(Parser... parsers) {
+    @SuppressWarnings("unchecked")
+    @SafeVarargs
+    static <T extends AST> Parser<T> oneOf(Parser<? extends AST>... parsers) {
         if (parsers.length == 0) {
             throw new IllegalArgumentException("At least one parser must be provided");
         }
 
         return input -> {
             ParseException exception = null;
-            for (Parser parser : parsers) {
+            for (Parser<? extends AST> parser : parsers) {
                 try {
-                    return parser.parse(input);
+                    return (ParseResult<T>) parser.parse(input);
                 } catch (ParseException e) {
                     exception = e;
                 }
@@ -62,35 +73,29 @@ public interface Parser {
         };
     }
 
-    static Parser optional(Parser parser) {
-        return input -> {
-            try {
-                return parser.parse(input);
-            } catch (ParseException e) {
-                return new ParseResult(new EmptyAST(), input);
-            }
-        };
+    static <T extends AST> Parser<OptionalAST<T>> optional(Parser<T> parser) {
+        return OptionalAST.parser(parser);
     }
 
     @FunctionalInterface
-    public interface ParserMapLambda {
-        public AST fn(AST value);
+    interface ParserMapLambda<I extends AST, O extends AST> {
+        O apply(I value);
     }
 
-    static Parser map(Parser parser, ParserMapLambda map) {
+    static <I extends AST, O extends AST> Parser<O> map(Parser<I> parser, ParserMapLambda<I, O> map) {
         return input -> {
             var result = parser.parse(input);
-            return new ParseResult(map.fn(result.ast()), result.rest());
+            return new ParseResult<>(map.apply(result.ast()), result.rest());
         };
     }
 
-    static Parser zeroOrMore(Parser parser) {
+    static Parser<SequenceAST> zeroOrMore(Parser<?> parser) {
         return input -> {
             var asts = new ArrayList<AST>();
 
             while (true) {
                 try {
-                    ParseResult result = parser.parse(input);
+                    ParseResult<?> result = parser.parse(input);
                     asts.add(result.ast());
                     input = result.rest();
                 } catch (Exception e) {
@@ -98,45 +103,44 @@ public interface Parser {
                 }
             }
 
-            return new ParseResult(new SequenceAST(asts), input);
+            return new ParseResult<>(new SequenceAST(asts), input);
         };
     }
 
-    static Parser oneOrMore(Parser parser) {
-        return map(sequence(parser, oneOrMore(parser)),
-                (AST ast) -> {
-                    SequenceAST sequenceAst = (SequenceAST) ast;
-                    AST head = sequenceAst.values().get(0);
-                    SequenceAST tail = ((SequenceAST) sequenceAst.values().get(1));
+    static Parser<SequenceAST> oneOrMore(Parser<?> parser) {
+        return map(sequence(parser, zeroOrMore(parser)),
+                (SequenceAST ast) -> {
+                    AST head = ast.values().get(0);
+                    SequenceAST tail = ((SequenceAST) ast.values().get(1));
                     tail.values().add(0, head);
 
                     return tail;
                 });
     }
 
-    static Parser item() {
+    static Parser<ItemAST> item() {
         return input -> {
             if (input.isEmpty()) {
                 throw ParseException.UNEXPECTED_EOF();
             }
-            return new ParseResult(new ItemAST(input.charAt(0)), input.subSequence(1, input.length()));
+            return new ParseResult<>(new ItemAST(input.charAt(0)), input.subSequence(1, input.length()));
         };
     }
 
-    static Parser literal(@NotNull String literal) {
+    static Parser<LiteralAST> literal(@NotNull String literal) {
         return input -> {
             if (input.length() < literal.length()) {
                 throw ParseException.UNEXPECTED_EOF();
             }
             if (input.subSequence(0, literal.length()).toString().equals(literal)) {
-                return new ParseResult(new LiteralAST(literal), input.subSequence(literal.length(), input.length()));
+                return new ParseResult<>(new LiteralAST(literal), input.subSequence(literal.length(), input.length()));
             }
 
             throw ParseException.EXPECTED_LITERAL(literal);
         };
     }
 
-    static Parser regex(@NotNull String regex, @NotNull Supplier<ParseException> exceptionSupplier) {
+    static Parser<RegexAST> regex(@NotNull String regex, @NotNull Supplier<ParseException> exceptionSupplier) {
         Pattern pattern = Pattern.compile(regex);
         return input -> {
             Matcher matcher = pattern.matcher(input);
@@ -145,51 +149,26 @@ public interface Parser {
                 for (int i = 1; i <= matcher.groupCount(); i++) {
                     groups[i - 1] = matcher.group(i);
                 }
-                return new ParseResult(new RegexAST(matcher.group(), groups), input.subSequence(matcher.end(), input.length()));
+                return new ParseResult<>(new RegexAST(matcher.group(), groups), input.subSequence(matcher.end(), input.length()));
             }
             throw exceptionSupplier.get();
         };
     }
 
-    static Parser regex(@NotNull String regex, @NotNull String message) {
+    static Parser<RegexAST> regex(@NotNull String regex, @NotNull String message) {
         return regex(regex, () -> new ParseException(message));
     }
 
-    static Parser surroundedBy(Parser inner, Parser surrounder) {
+    @SuppressWarnings("unchecked")
+    static <T extends AST> Parser<T> surroundedBy(Parser<T> inner, Parser<?> surrounder) {
         return map(
                 sequence(surrounder, inner, surrounder),
-                (AST ast) -> ((SequenceAST) ast).values().get(1)
+                (SequenceAST ast) -> (T) ast.values().get(1)
         );
     }
 
-    static Parser skipWhitespace(Parser inner) {
-        return surroundedBy(inner, zeroOrMore(test(
-                item(),
-                (AST ast) -> {
-                    switch (((ItemAST)ast).value()) {
-                        case ' ': case '\t': case '\b': case '\n':
-                            return true;
-                    }
-                    return false;
-                },
-                ""
-        )));
-    }
-
-    static Parser integer() {
-        return oneOf(
-                /* FIXME(cdecompilador): this is bad, we may need to refactor ParseResult */
-                map(regex("[+-]?(0|[1-9][0-9]*)", "Excepted integer"), (AST ast) -> {
-                    RegexAST r = (RegexAST)ast;
-                    return new IntLiteralAST(Integer.parseInt(r.value()));
-                })
-                    /* TODO(cdecompilador): convert to IntLiteralAST
-                    regex("([+-]?\\d+)(?:[eE](\\+?\\d+))?", "Expected an integer"),
-                    regex("[+-]?0[bB][01]+", "Expected an integer"),
-                    regex("[+-]?0[oO][0-7]+", "Expected an integer"),
-                    regex("[+-]?0[xX][0-9a-fA-F]+", "Expected an integer")
-                    */
-        );
+    static <T extends AST> Parser<T> skipWhitespace(Parser<T> inner) {
+        return surroundedBy(inner, regex("\\s*", "Expected whitespace"));
     }
 
     /* TODO: Add the FloatLiteral type

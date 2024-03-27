@@ -11,11 +11,15 @@ public class StmtAST implements AST {
         visitor.visit(this);
     }
 
-    public static Parser parser() {
-        return Parser.sequence(Parser.skipWhitespace(Parser.oneOf(
-                AssignStmtAST.parser()
-                /* Add more Stmts here */
-        )), Parser.literal(";"));
+    @SuppressWarnings("unchecked")
+    public static <T extends StmtAST> Parser<T> parser() {
+        return Parser.map(
+                Parser.sequence(Parser.skipWhitespace(Parser.oneOf(
+                        AssignStmtAST.$parser()
+                        /* Add more Stmts here */
+                )), Parser.literal(";")),
+                (SequenceAST ast) -> (T) ast.values().get(0)
+        );
     }
 
 }
