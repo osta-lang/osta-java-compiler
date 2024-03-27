@@ -1,4 +1,4 @@
-package org.osta.lex.token;
+package org.osta.token;
 
 public enum TokenType {
     // Keywords

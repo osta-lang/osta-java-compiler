@@ -27,15 +27,30 @@ public class BufferCharSequence implements CharSequence {
     public CharSequence subSequence(int start, int end) {
         // Return as string
         int position = buffer.position();
-        byte[] bytes = new byte[end - start];
-        buffer.get(bytes);
+        int limit = buffer.limit();
+        buffer.position(position + start);
+        buffer.limit(position + end);
+        BufferCharSequence result = slice();
         buffer.position(position);
-        return new String(bytes);
+        buffer.limit(limit);
+        return result;
     }
 
     @Override
     @NotNull
     public String toString() {
-        return super.toString();
+        return asString();
+    }
+
+    public String asString() {
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.mark();
+        buffer.get(bytes);
+        buffer.reset();
+        return new String(bytes);
+    }
+
+    private BufferCharSequence slice() {
+        return new BufferCharSequence(buffer.slice(buffer.position(), buffer.limit() - buffer.position()));
     }
 }
