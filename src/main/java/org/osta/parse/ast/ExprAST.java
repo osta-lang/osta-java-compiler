@@ -10,7 +10,7 @@ public class ExprAST implements AST {
     }
 
     public static Parser<ExprAST> parser() {
-        return Parser.oneOf(
+        return Parser.anyOf(
                 BinaryExprAST.$parser(),
                 FactorExprAST.$parser(),
                 Parser.map(
