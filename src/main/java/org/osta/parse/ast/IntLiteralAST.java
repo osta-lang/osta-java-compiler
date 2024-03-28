@@ -21,13 +21,12 @@ public final class IntLiteralAST extends FactorExprAST {
                 Parser.regex("[+-]?0[bB][01]+", "Expected an integer"),
                 Parser.regex("[+-]?0[oO][0-7]+", "Expected an integer"),
                 Parser.regex("[+-]?0[xX][0-9a-fA-F]+", "Expected an integer")
-        ), (AST ast) -> {
-            RegexAST r = (RegexAST)ast;
-            if (r.groups().length > 0) {
-                return new IntLiteralAST(Integer.parseInt(r.value()));
+        ), (RegexAST ast) -> {
+            if (ast.groups().length > 0) {
+                return new IntLiteralAST(Integer.parseInt(ast.value()));
             }
-            int value = Integer.parseInt(r.groups()[0]);
-            int exponent = Integer.parseInt(r.groups()[1]);
+            int value = Integer.parseInt(ast.groups()[0]);
+            int exponent = Integer.parseInt(ast.groups()[1]);
             if (exponent == 0) {
                 return new IntLiteralAST(value);
             }

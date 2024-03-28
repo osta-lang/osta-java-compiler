@@ -53,9 +53,19 @@ public interface Parser<T extends AST> {
         };
     }
 
+    /**
+     * Returns a parser that tries to parse the input with each of the provided parsers in order.
+     * The first successful parser will determine the return value of the new parser.
+     * If none of the parsers succeed, the parser will throw a {@link ParseException}.
+     * @param parsers The parsers to try
+     * @return A parser that tries to parse the input with each of the provided parsers in order
+     * @param <T> The return type of the parsers
+     * @throws IllegalArgumentException If no parsers are provided
+     * @see #oneOf(Parser[]) For a parser that tries to parse the input with each of the provided parsers in order where the parsers have the same return type
+     */
     @SuppressWarnings("unchecked")
     @SafeVarargs
-    static <T extends AST> Parser<T> oneOf(Parser<? extends AST>... parsers) {
+    static <T extends AST> Parser<T> anyOf(Parser<? extends AST>... parsers) {
         if (parsers.length == 0) {
             throw new IllegalArgumentException("At least one parser must be provided");
         }
@@ -65,6 +75,35 @@ public interface Parser<T extends AST> {
             for (Parser<? extends AST> parser : parsers) {
                 try {
                     return (ParseResult<T>) parser.parse(input);
+                } catch (ParseException e) {
+                    exception = e;
+                }
+            }
+            throw exception;
+        };
+    }
+
+    /**
+     * Returns a parser that tries to parse the input with each of the provided parsers in order.
+     * The first successful parser will determine the return value of the new parser.
+     * If none of the parsers succeed, the parser will throw a {@link ParseException}.
+     * @param parsers The parsers to try, all of which must have the same return type
+     * @return A parser that tries to parse the input with each of the provided parsers in order
+     * @param <T> The return type of the parsers
+     * @throws IllegalArgumentException If no parsers are provided
+     * @see #anyOf(Parser[]) For a parser that tries to parse the input with each of the provided parsers in order where the parsers may have different return types
+     */
+    @SafeVarargs
+    static <T extends AST> Parser<T> oneOf(Parser<T>... parsers) {
+        if (parsers.length == 0) {
+            throw new IllegalArgumentException("At least one parser must be provided");
+        }
+
+        return input -> {
+            ParseException exception = null;
+            for (Parser<T> parser : parsers) {
+                try {
+                    return parser.parse(input);
                 } catch (ParseException e) {
                     exception = e;
                 }
